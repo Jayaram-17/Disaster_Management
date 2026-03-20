@@ -1,0 +1,104 @@
+{% extends 'core/layout.html' %}
+{% load static %}
+{% block content %}
+<div style="text-align: center; margin-bottom: 2rem;">
+    <button id="sosBtn" style="background:var(--accent-color); color:white; padding:1rem 2rem; border-radius:2rem; font-size:1.2rem; font-weight:700; border:none; cursor:pointer; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.5);"><i class="fa-solid fa-tower-broadcast"></i> EMERGENCY SOS</button>
+</div>
+<div style="display:flex; justify-content:space-between; gap:1rem; margin-bottom: 2rem; overflow-x:auto;">
+    <img src="{% static 'core/images/flood.png' %}" style="height:200px; border-radius:1rem; object-fit:cover; flex:1;" alt="Flood">
+    <img src="{% static 'core/images/fire.png' %}" style="height:200px; border-radius:1rem; object-fit:cover; flex:1;" alt="Fire">
+    <img src="{% static 'core/images/earthquake.png' %}" style="height:200px; border-radius:1rem; object-fit:cover; flex:1;" alt="Earthquake">
+</div>
+<div class="dashboard">
+    <!-- Active Alerts Column -->
+    <div class="card">
+        <h2><i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-color);"></i> Active Alerts</h2>
+        <div class="alerts-list">
+            {% if alerts %}
+                {% for alert in alerts %}
+                    <div class="alert-item severity-{{ alert.severity|lower }}">
+                        <div class="alert-title">{{ alert.title }}</div>
+                        <div class="alert-desc">{{ alert.description }}</div>
+                        <div class="alert-meta">
+                            <span>Severity: {{ alert.get_severity_display }}</span>
+                            <span>{{ alert.date_posted|date:"M d, Y H:i" }}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: #94a3b8;">No active alerts at the moment. Stay safe!</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Safety Guidelines Column -->
+    <div class="card">
+        <h2><i class="fa-solid fa-book-medical" style="color: var(--primary-color);"></i> Safety Guidelines</h2>
+        <div class="guides-list">
+            {% if guidelines %}
+                {% for guide in guidelines %}
+                    <div class="guide-item">
+                        <div class="alert-title">{{ guide.category }}</div>
+                        <div class="alert-desc">{{ guide.content }}</div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: #94a3b8;">Guidelines will appear here.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('sosBtn').addEventListener('click', () => {
+    const sosBtn = document.getElementById('sosBtn');
+    sosBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending SOS...';
+
+    function dispatchSOS(lat, lon) {
+        let payload = { message: "SOS" };
+        if (lat && lon) payload.location = { latitude: lat, longitude: lon };
+        
+        fetch('/api/chat/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(res => res.json()).then(data => {
+            alert(data.response || "Emergency dispatch triggered.");
+            sosBtn.innerHTML = '<i class="fa-solid fa-check"></i> RESCUE DISPATCHED';
+            sosBtn.style.background = '#22c55e';
+        }).catch(err => {
+            alert("Failed to send SOS. Please check your internet connection.");
+            sosBtn.innerHTML = '<i class="fa-solid fa-tower-broadcast"></i> EMERGENCY SOS';
+        });
+    }
+
+    async function fallbackIPLocation() {
+        try {
+            console.log("Attempting IP-based location fallback with GeoJS...");
+            const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
+            const data = await res.json();
+            if (data.latitude && data.longitude) {
+                dispatchSOS(data.latitude, data.longitude);
+            } else {
+                dispatchSOS(null, null);
+            }
+        } catch (e) {
+            console.log("IP Location failed:", e);
+            dispatchSOS(null, null);
+        }
+    }
+
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => dispatchSOS(pos.coords.latitude, pos.coords.longitude),
+             (err) => { 
+                 console.log("HTML5 Location unavailable. Triggering IP Fallback.");
+                 fallbackIPLocation();
+             }, { timeout: 8000 }
+        );
+    } else {
+        fallbackIPLocation();
+    }
+});
+</script>
+{% endblock %}
